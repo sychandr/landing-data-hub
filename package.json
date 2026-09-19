@@ -1,0 +1,21 @@
+{
+  "name": "landing-data-hub",
+  "version": "0.0.0",
+  "private": true,
+  "engines": {
+    "node": ">=20"
+  },
+  "packageManager": "pnpm@9.13.2",
+  "scripts": {
+    "dev": "pnpm --parallel --filter './apps/*' run dev",
+    "dev:api": "pnpm --filter @landing-data-hub/api dev",
+    "dev:dashboard": "pnpm --filter @landing-data-hub/dashboard dev",
+    "lint": "biome lint .",
+    "format": "biome format --write .",
+    "check": "biome check ."
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.5.14",
+    "typescript": "^7.0.2"
+  }
+}
