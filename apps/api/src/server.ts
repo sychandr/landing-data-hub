@@ -1,14 +1,18 @@
 import Fastify from 'fastify';
+import { env } from './config/env.js';
+import { corsPlugin } from './plugins/cors.js';
+import { inquiriesRoutes } from './routes/inquiries.routes.js';
 
 const server = Fastify({ logger: true });
 
-server.get('/health', async () => ({ status: 'ok' }));
+server.register(corsPlugin);
 
-const port = Number(process.env.PORT ?? 3000);
+server.get('/health', async () => ({ status: 'ok' }));
+server.register(inquiriesRoutes);
 
 const start = async () => {
   try {
-    await server.listen({ port });
+    await server.listen({ port: env.PORT });
   } catch (err) {
     server.log.error(err);
     process.exit(1);
