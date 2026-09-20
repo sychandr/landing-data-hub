@@ -1,0 +1,6 @@
+[build]
+  command = "pnpm install --frozen-lockfile && pnpm --filter @landing-data-hub/dashboard build"
+  publish = "apps/dashboard/dist"
+
+[build.environment]
+  NODE_VERSION = "22"
