@@ -49,10 +49,41 @@ export interface CreateInquiryInput {
   metadata?: Record<string, unknown>;
 }
 
-interface PageOptions {
+export interface ListInquiriesFilters {
+  projectId?: string;
+  search?: string;
+  dateFrom?: string;
+  dateTo?: string;
+  sortBy?: 'createdAt' | 'name' | 'email' | 'projectId';
+  sortDir?: 'asc' | 'desc';
   limit?: number;
   offset?: number;
 }
+
+export interface ListInquiriesResult {
+  data: Inquiry[];
+  total: number;
+}
+
+export interface InquiryProjectStats {
+  projectId: string;
+  count: number;
+}
+
+export interface InquiryTimelineStats {
+  bucket: string;
+  count: number;
+}
+
+const SORT_COLUMNS: Record<
+  NonNullable<ListInquiriesFilters['sortBy']>,
+  string
+> = {
+  createdAt: 'created_at',
+  name: 'name',
+  email: 'email',
+  projectId: 'project_id',
+};
 
 function toInquiry(row: InquiryRow): Inquiry {
   return {
@@ -103,38 +134,93 @@ export async function createInquiry(
 }
 
 export async function listInquiries({
+  projectId,
+  search,
+  dateFrom,
+  dateTo,
+  sortBy = 'createdAt',
+  sortDir = 'desc',
   limit = 50,
   offset = 0,
-}: PageOptions = {}): Promise<Inquiry[]> {
-  const { data, error } = await supabase
-    .from('hub_inquiries')
-    .select('*')
-    .order('created_at', { ascending: false })
+}: ListInquiriesFilters = {}): Promise<ListInquiriesResult> {
+  let query = supabase.from('hub_inquiries').select('*', { count: 'exact' });
+
+  if (projectId) {
+    query = query.eq('project_id', projectId);
+  }
+
+  if (search) {
+    // Quoted so commas/parentheses in user input can't break out of the
+    // PostgREST `.or()` filter syntax and inject extra filter clauses.
+    const escaped = search.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+    const pattern = `"%${escaped}%"`;
+    query = query.or(
+      `name.ilike.${pattern},email.ilike.${pattern},message.ilike.${pattern}`,
+    );
+  }
+
+  if (dateFrom) {
+    query = query.gte('created_at', dateFrom);
+  }
+
+  if (dateTo) {
+    query = query.lte('created_at', dateTo);
+  }
+
+  const { data, error, count } = await query
+    .order(SORT_COLUMNS[sortBy], { ascending: sortDir === 'asc' })
     .range(offset, offset + limit - 1);
 
   if (error) {
     throw new Error(`Failed to list inquiries: ${error.message}`);
   }
 
-  return data.map(toInquiry);
+  return { data: data.map(toInquiry), total: count ?? 0 };
 }
 
-export async function listInquiriesByProject(
-  projectId: string,
-  { limit = 50, offset = 0 }: PageOptions = {},
-): Promise<Inquiry[]> {
-  const { data, error } = await supabase
-    .from('hub_inquiries')
-    .select('*')
-    .eq('project_id', projectId)
-    .order('created_at', { ascending: false })
-    .range(offset, offset + limit - 1);
+export async function getInquiriesByProjectStats({
+  dateFrom,
+  dateTo,
+}: {
+  dateFrom?: string;
+  dateTo?: string;
+} = {}): Promise<InquiryProjectStats[]> {
+  const { data, error } = await supabase.rpc('hub_inquiries_by_project_stats', {
+    date_from: dateFrom ?? null,
+    date_to: dateTo ?? null,
+  });
 
   if (error) {
-    throw new Error(
-      `Failed to list inquiries for project ${projectId}: ${error.message}`,
-    );
+    throw new Error(`Failed to load inquiries stats by project: ${error.message}`);
   }
 
-  return data.map(toInquiry);
+  return (data ?? []).map((row: { project_id: string; count: number }) => ({
+    projectId: row.project_id,
+    count: row.count,
+  }));
+}
+
+export async function getInquiriesTimelineStats({
+  granularity = 'day',
+  dateFrom,
+  dateTo,
+}: {
+  granularity?: 'day' | 'week' | 'month';
+  dateFrom?: string;
+  dateTo?: string;
+} = {}): Promise<InquiryTimelineStats[]> {
+  const { data, error } = await supabase.rpc('hub_inquiries_timeline_stats', {
+    granularity,
+    date_from: dateFrom ?? null,
+    date_to: dateTo ?? null,
+  });
+
+  if (error) {
+    throw new Error(`Failed to load inquiries timeline stats: ${error.message}`);
+  }
+
+  return (data ?? []).map((row: { bucket: string; count: number }) => ({
+    bucket: row.bucket,
+    count: row.count,
+  }));
 }
