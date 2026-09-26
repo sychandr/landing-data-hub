@@ -41,6 +41,7 @@ export type InquiriesStatsQuery = z.infer<typeof inquiriesStatsQuerySchema>;
 
 export const inquiriesTimelineQuerySchema = inquiriesStatsQuerySchema.extend({
   granularity: z.enum(['day', 'week', 'month']).default('day'),
+  projectId: z.string().min(1).optional(),
 });
 
 export type InquiriesTimelineQuery = z.infer<typeof inquiriesTimelineQuerySchema>;

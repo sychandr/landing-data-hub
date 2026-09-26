@@ -204,15 +204,18 @@ export async function getInquiriesTimelineStats({
   granularity = 'day',
   dateFrom,
   dateTo,
+  projectId,
 }: {
   granularity?: 'day' | 'week' | 'month';
   dateFrom?: string;
   dateTo?: string;
+  projectId?: string;
 } = {}): Promise<InquiryTimelineStats[]> {
   const { data, error } = await supabase.rpc('hub_inquiries_timeline_stats', {
     granularity,
     date_from: dateFrom ?? null,
     date_to: dateTo ?? null,
+    p_project_id: projectId ?? null,
   });
 
   if (error) {
